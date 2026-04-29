@@ -20,7 +20,7 @@ runs/<run_id>/{run_metadata.json, trace_raw.jsonl, outcome_backfill.jsonl,
 4. **backtest 出力永続化** (P3.5): `kabu.backtest.io.write_backtest_outputs(paths=..., result=..., created_at=...)` で `trades.jsonl` / `skipped_fills.jsonl` / `backtest_result.json` を一括 write。`backtest_result.json` は **summary + file references**、本体は JSONL に分離。
 5. **future_outcome enrich** (PR-S3): bar_ts + N 日経過後に `kabu.outcome.enrich_future_outcomes` が forward_return / mfe / mae を計算、`kabu.outcome.write_outcome_backfill_jsonl` が `runs/<run_id>/outcome_backfill.jsonl` に append。decision builder からは参照禁止 (POINT_IN_TIME.md 3-7)。
 6. **trace_joined 生成** (PR-S4): `kabu.outcome.join_traces_with_outcomes` を使って trace_raw と outcome_backfill を (run_id, symbol, bar_ts) で結合し `runs/<run_id>/trace_joined.jsonl` に出力。再現可能 join。
-7. **stats 集計** (PR-S4): `trades.jsonl` / `trace_joined.jsonl` / `run_metadata.json` を読み aggregate_many / cross_stats を実行、`runs/<run_id>/stats/` に Markdown + JSON で出力。**P3.5 はこの集計実装は含まない**。
+7. **stats 集計** (PR-S4 で実装済): `kabu.stats.run_full_stats(load_run_inputs(paths))` で `runs/<run_id>/stats/summary.{md,json}` を出力。bucket 境界・最低標本数・ヘッダ必須項目は `docs/STATS.md` に固定。観測専用で売買ルールではない。
 8. **attribution** (PR-S4.5): symbol / period / sector / regime 別の損益寄与を分解。
 9. **AI Review** (PR-S10): aggregated stats のみを入力として改善提案を生成、`runs/ai_review/<run_id>/proposals.json` に保存。提案は人間承認制。
 

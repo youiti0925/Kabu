@@ -186,6 +186,7 @@ runs/<run_id>/
 - `kabu.backtest.io.BacktestResultSummary` の必須フィールド: `run_id`, `created_at` (tz-aware), `initial_cash_jpy`, `final_cash_jpy`, `trade_count`, `skipped_count`, `open_position_count`, `trace_jsonl_path`, `trades_jsonl_path`, `skipped_fills_jsonl_path`。reader が欠落で `ValueError`。
 - `kabu.backtest.engine.SkippedFill` は P3.5 で `run_id` / `symbol` / `attempted_fill_ts` を必須に拡張。pytest `test_skipped_fill_jsonl_roundtrip` で round-trip を保証。
 - `runs/` は **git 管理しない** (RISKS.md 5-3 / `.gitignore` / `scripts/check_no_forbidden_paths.py`)。テストはすべて `tmp_path` を使う。pytest `test_run_paths_use_tmp_path` / `test_no_committed_run_outputs`。
+- PR-S4 stats も `runs/<run_id>/stats/summary.{md,json}` 形式で同じ規約に従う (docs/STATS.md §5)。
 - `RunPaths.run_id` は path traversal を含む文字列を拒否 (`..`, `/`, `\\`, `\x00`)。
 - `kabu.backtest.io.write_backtest_outputs(*, paths, result, created_at)` で trades.jsonl / skipped_fills.jsonl / backtest_result.json を一括 write。
 

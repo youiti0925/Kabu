@@ -42,10 +42,12 @@ Kabu の既知のリスクと限界。各 stats レポートと AI Review はこ
 
 - 説明: 軸数 / bucket 数を増やすほど偽陽性が出る。
 - 対策:
-  - 最低標本数フィルタ (例 N>=30)
-  - Benjamini-Hochberg 等の多重検定補正
-  - block bootstrap で信頼区間を出す
-  - walk-forward / out-of-sample 分割
+  - 最低標本数フィルタ (PR-S4 MVP: `DEFAULT_MINIMUM_N = 30`、`low_sample = true` フラグで警告。docs/STATS.md §1)
+  - PR-S4 cross 集計は **2 軸まで** に制限 (3 軸以上は MVP 外)
+  - 将来追加: Benjamini-Hochberg 等の多重検定補正
+  - 将来追加: block bootstrap で信頼区間を出す
+  - 将来追加: walk-forward / out-of-sample 分割
+- AI Review (PR-S10) は将来 low_sample bucket を C カテゴリ提案に使ってはならない (AI_REVIEW_SAFETY.md §10 系 / docs/STATS.md §1)。
 - TRACE_ANALYSIS_WORKFLOW.md と整合。
 
 ### 1-6. 多重検定 / multiple testing

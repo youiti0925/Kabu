@@ -14,8 +14,9 @@ Kabu の PR ロードマップと pytest 不変条件候補。承認は段階的
 | PR-S1 | data source interface (Source Protocol) + indicators 純粋関数群 | **完了** (commit 694bba4、CI green 確認済) |
 | PR-S2 | decision_trace MVP (kabu.trace.v1 schema / dataclass / builder / JSONL I/O / 11 不変条件テスト) | **完了** (commit 1f80fec、CI green 確認済) |
 | PR-S3 | backtest_engine MVP + scripted-action engine + run_metadata.json + future_outcome enrich (`kabu.outcome`) | **完了** (commit 64908cd、CI green 確認済) |
-| P3.5 | run output layout 固定 (`kabu.run_paths`) + Trade/SkippedFill/BacktestResult I/O (`kabu.backtest.io`) + SkippedFill 拡張 | **本 PR で完了予定** |
-| PR-S4 | trace-stats MVP (final_action × outcome ほか、P3.5 で固定した入力を使用) | 未着手 (要承認) |
+| P3.5 | run output layout 固定 (`kabu.run_paths`) + Trade/SkippedFill/BacktestResult I/O (`kabu.backtest.io`) + SkippedFill 拡張 | **完了** (commit a591972、CI green 確認済) |
+| PR-S4 | trace-stats MVP (`kabu.stats`、aggregate / cross / report、bucket 境界 docs 化) | **本 PR で完了予定** |
+| PR-S4.5 | attribution MVP (symbol / period 寄与) | 未着手 (要承認) |
 
 ---
 
@@ -41,7 +42,7 @@ Kabu の PR ロードマップと pytest 不変条件候補。承認は段階的
 | 6 | PR-S2 | decision_trace MVP (market / technical / long_term_trend / risk_ctx / decision / execution_assumption / future_outcome=None の最小版 + JSONL I/O) | **完了予定 (本 PR)** | SCHEMA.md / POINT_IN_TIME.md | test_schema_version_required / test_bar_ts_tzaware / test_decision_rule_id_required / test_confidence_value_range / test_technical_adjustment_basis_required / test_assumed_fill_bar_required / test_latency_bars_required / test_forward_return_basis_required / test_decision_does_not_depend_on_outcome / test_library_id_not_top_level / test_trace_jsonl_roundtrip |
 | 7 | PR-S2.5 | look-ahead invariant tests harness (テスト基盤強化) | 未着手 | POINT_IN_TIME.md | (上記 + 不変条件チェックの汎用 harness) |
 | 8 | PR-S3 | backtest_engine MVP + scripted-decision engine + run_metadata.json + future_outcome enrich パイプライン | **完了予定 (本 PR)** | BACKTEST_CONTRACT.md S0 D-15 / D-18 / SCHEMA.md / POINT_IN_TIME.md 3-7 | test_run_metadata_required / test_trace_jsonl_path_required_for_trades / test_assumed_fill_next_open / test_same_close_fill_forbidden / test_fee_and_slippage_applied / test_dividend_ex_day_handling / test_stop_high_low_block / test_volume_floor_cap / test_survivorship_policy_recorded / test_future_outcome_backfill_separate |
-| 9 | PR-S4 | trace-stats MVP (final_action × outcome ほか) | 未着手 | TRACE_ANALYSIS_WORKFLOW.md | (集計 IO テスト) |
+| 9 | PR-S4 | trace-stats MVP (`kabu.stats`: loaders / buckets / aggregate / cross / report) | **完了予定 (本 PR)** | TRACE_ANALYSIS_WORKFLOW.md / STATS.md | test_load_run_inputs_requires_metadata / test_load_run_inputs_run_id_mismatch / test_stats_header_contains_bias_warnings / test_aggregate_final_action_outcome / test_aggregate_symbol_outcome / test_skip_reason_counts / test_trade_pnl_summary / test_low_sample_bucket_flag / test_bucket_boundaries_documented / test_cross_stats_two_axis / test_stats_writer_uses_tmp_path |
 | 10 | PR-S4.5 | attribution MVP (symbol / period 寄与) | 未着手 | TRACE_ANALYSIS_WORKFLOW.md | (寄与集計テスト) |
 | 11 | PR-S5 | market_index_context + sector_context | 未着手 | DATA_SOURCES.md / CALENDAR.md §0 D-8 (海外時差) / SCHEMA.md | test_us_index_no_lookahead 系 / regime 算出のテスト |
 | 12 | PR-S7 | earnings / event_context (**S6 より先に着手**) | 未着手 | CALENDAR.md §0 D-9 / POINT_IN_TIME.md §3 / SCHEMA.md (earnings_ctx / event_ctx) | release_ts 不変条件テスト / blackout テスト |
