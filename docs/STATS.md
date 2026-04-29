@@ -190,6 +190,7 @@ Markdown / JSON 両方に以下を含める:
 
 - BACKTEST_CONTRACT.md §6-A: run output layout
 - TRACE_ANALYSIS_WORKFLOW.md §1: 全体パイプライン
+- ATTRIBUTION.md: P4.5 寄与・偏り・集中の観測 (本 docs と相補)
 - POINT_IN_TIME.md §3-7: future_outcome は post-processing
 - AI_REVIEW_SAFETY.md §10 系: low_sample bucket を C 提案に使わない
 - ROADMAP.md

@@ -21,7 +21,7 @@ runs/<run_id>/{run_metadata.json, trace_raw.jsonl, outcome_backfill.jsonl,
 5. **future_outcome enrich** (PR-S3): bar_ts + N 日経過後に `kabu.outcome.enrich_future_outcomes` が forward_return / mfe / mae を計算、`kabu.outcome.write_outcome_backfill_jsonl` が `runs/<run_id>/outcome_backfill.jsonl` に append。decision builder からは参照禁止 (POINT_IN_TIME.md 3-7)。
 6. **trace_joined 生成** (PR-S4): `kabu.outcome.join_traces_with_outcomes` を使って trace_raw と outcome_backfill を (run_id, symbol, bar_ts) で結合し `runs/<run_id>/trace_joined.jsonl` に出力。再現可能 join。
 7. **stats 集計** (PR-S4 で実装済): `kabu.stats.run_full_stats(load_run_inputs(paths))` で `runs/<run_id>/stats/summary.{md,json}` を出力。bucket 境界・最低標本数・ヘッダ必須項目は `docs/STATS.md` に固定。観測専用で売買ルールではない。
-8. **attribution** (PR-S4.5): symbol / period / sector / regime 別の損益寄与を分解。
+8. **attribution** (P4.5 で実装済): `kabu.attribution.run_full_attribution(load_run_inputs(paths))` で `runs/<run_id>/stats/attribution.{md,json}` を出力。symbol / sector / period (year/quarter/month) / rule_id / rule_version / skip_reason / outcome に分解し、1 bucket への 50% 超 集中を `concentration_warnings` として警告。観測のみ、原因確定ではなく銘柄推奨でもない (docs/ATTRIBUTION.md)。
 9. **AI Review** (PR-S10): aggregated stats のみを入力として改善提案を生成、`runs/ai_review/<run_id>/proposals.json` に保存。提案は人間承認制。
 
 注:
