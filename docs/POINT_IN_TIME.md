@@ -74,8 +74,9 @@ CALENDAR.md §0 D-8 / §6 を不変条件として反映。
 SCHEMA.md §0 D-11 / §4-10 と連動。
 
 - `future_outcome.*` を decision builder / risk builder / execution_assumption builder の **入力に含めない**。
-- 型シグネチャレベルで強制する。`build_decision_slice(market, technical, long_term_trend, ..., bar_ts) -> DecisionSlice` のような関数に future_outcome を渡せないようにする。
-- pytest `test_decision_does_not_depend_on_outcome` (PR-S2) で、builder の引数仕様 (typing 経由) を確認する。
+- 型シグネチャレベルで強制する。`kabu.decision_trace_build.build_trace(...)` (PR-S2 で導入) は signature に `future_outcome` を持たず、`*` で keyword-only。`future_outcome=...` を渡すと `TypeError`。
+- `build_trace` が返す `Trace` の `slices.future_outcome` は常に `None`。post-processing (PR-S3 / S4) で別経路から enrich する。
+- pytest `test_decision_does_not_depend_on_outcome` (PR-S2) で、builder の引数仕様 (typing / inspect.signature) を確認する。
 
 ---
 

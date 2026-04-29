@@ -10,8 +10,10 @@ Kabu の PR ロードマップと pytest 不変条件候補。承認は段階的
 |---|---|---|
 | P0.9 docs | 設計・契約・ポリシー docs 一式 (DATA_SOURCES / UNIVERSE / CALENDAR / SCHEMA / POINT_IN_TIME / SURVIVORSHIP / BACKTEST_CONTRACT / AI_REVIEW_SAFETY / ANTI_FX_LEAK / RISKS / ROADMAP / TRACE_ANALYSIS_WORKFLOW) | **完了** (commit 12d060d) |
 | N1 guardrails | CI / pre-commit / 5 guard scripts (anti-FX-leak / large-files / forbidden-paths / gitignore / secrets) + smoke pytest | **完了** (commit c95acef、CI green 確認済) |
-| N2 方針確定 | DATA_SOURCES / UNIVERSE / CALENDAR / BACKTEST_CONTRACT / SCHEMA / POINT_IN_TIME / ROADMAP の MVP 決定の docs 化 | **本 PR で完了予定** |
-| PR-S1 | data source interface (Source Protocol) + indicators 純粋関数群 | 未着手 (要承認) |
+| N2 方針確定 | DATA_SOURCES / UNIVERSE / CALENDAR / BACKTEST_CONTRACT / SCHEMA / POINT_IN_TIME / ROADMAP の MVP 決定の docs 化 | **完了** (commit 897f5f8、CI green 確認済) |
+| PR-S1 | data source interface (Source Protocol) + indicators 純粋関数群 | **完了** (commit 694bba4、CI green 確認済) |
+| PR-S2 | decision_trace MVP (kabu.trace.v1 schema / dataclass / builder / JSONL I/O / 11 不変条件テスト) | **本 PR で完了予定** |
+| PR-S3 | backtest_engine MVP + placeholder ルール + run_metadata + future_outcome enrich パイプライン | 未着手 (要承認) |
 
 ---
 
@@ -34,7 +36,7 @@ Kabu の PR ロードマップと pytest 不変条件候補。承認は段階的
 | 3 | PR-S0.7 | CALENDAR / 営業日 / 売買単位 / tick_size 方針 | docs 化済 (実装は PR-S1 で) | CALENDAR.md | - |
 | 4 | PR-S0.9 | SCHEMA / POINT_IN_TIME / SURVIVORSHIP / BACKTEST_CONTRACT / AI_REVIEW_SAFETY / ANTI_FX_LEAK / RISKS の docs + CI / pre-commit guardrails | **完了** (12d060d, c95acef) | 全般 | test_no_fx_imports / test_no_large_files / etc. |
 | 5 | PR-S1 | data source interface (Source Protocol) + indicators 純粋関数群 | 未着手 (要承認) | DATA_SOURCES.md / SCHEMA.md (technical の adjustment_basis) | test_no_lookahead_indicators / test_split_adjustment_continuity / test_universe_snapshot_consistency |
-| 6 | PR-S2 | decision_trace MVP (market / technical / long_term_trend / decision / future_outcome / risk_ctx の最小版) | 未着手 | SCHEMA.md / POINT_IN_TIME.md | test_pointintime_slice_null_before_release / test_schema_version_required / test_decision_does_not_depend_on_outcome |
+| 6 | PR-S2 | decision_trace MVP (market / technical / long_term_trend / risk_ctx / decision / execution_assumption / future_outcome=None の最小版 + JSONL I/O) | **完了予定 (本 PR)** | SCHEMA.md / POINT_IN_TIME.md | test_schema_version_required / test_bar_ts_tzaware / test_decision_rule_id_required / test_confidence_value_range / test_technical_adjustment_basis_required / test_assumed_fill_bar_required / test_latency_bars_required / test_forward_return_basis_required / test_decision_does_not_depend_on_outcome / test_library_id_not_top_level / test_trace_jsonl_roundtrip |
 | 7 | PR-S2.5 | look-ahead invariant tests harness (テスト基盤強化) | 未着手 | POINT_IN_TIME.md | (上記 + 不変条件チェックの汎用 harness) |
 | 8 | PR-S3 | backtest_engine MVP + placeholder ルール + trace JSONL 出力 + run_metadata | 未着手 | BACKTEST_CONTRACT.md / SCHEMA.md | test_dividend_ex_day_handling / test_stop_high_low_block / test_volume_floor_cap / test_run_metadata_required / test_trace_jsonl_path_required_for_trades / test_survivorship_policy_recorded |
 | 9 | PR-S4 | trace-stats MVP (final_action × outcome ほか) | 未着手 | TRACE_ANALYSIS_WORKFLOW.md | (集計 IO テスト) |

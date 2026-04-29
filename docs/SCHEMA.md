@@ -28,6 +28,7 @@
 
 - 値: `"kabu.trace.v1"`
 - 意味: trace JSONL 1 レコードの構造バージョン。
+- 実装: `kabu.decision_trace.SCHEMA_VERSION` (PR-S2 で導入)。`Trace.__post_init__` および `trace_io.trace_from_dict` の両方でこの値を強制する。
 
 ### 1-1. 運用ポリシー (不変条件)
 
@@ -317,12 +318,14 @@ slice の値が null + reason 付き は許容。reason だけ無く null は不
 
 ### 5-6. library_id の配置 (決定)
 
-§0 D-12 / D-13 を反映。
+§0 D-12 / D-13 を反映。PR-S2 で writer / reader の挙動が固定された。
 
 - 旧 v1: `library_id` は top-level に optional として存在。これは **deprecated** とする。
 - 新規 trace は **slice 内に置く**。例: `slices.waveform_ctx.library_id`, `slices.waveform_ctx.library_kind`, `slices.waveform_ctx.feature_set`。
-- reader は v1 互換のため top-level の `library_id` を warning ログ付きで読み込み可。writer は新規には書かない。
-- `run_metadata.libraries` は配列とし、`[{slice, library_id, library_kind, feature_set}]` で複数 library を管理する (D-13)。これにより waveform 以外の slice (将来の `pattern_library` 等) を追加しても schema 衝突しない。
+- writer (`kabu.trace_io.write_traces_jsonl`) は **top-level `library_id` を書かない** (`trace_to_dict` が defensive に削除)。
+- reader (`kabu.trace_io.read_traces_jsonl`) は top-level の `library_id` を発見したら `DeprecationWarning` を出して **drop** する (構築する `Trace` には含まれない)。
+- `run_metadata.libraries` は `kabu.decision_trace.LibraryRef` の `tuple[LibraryRef, ...]` として保持される。`LibraryRef(slice, library_id, library_kind, feature_set)`。各フィールド非空必須 (D-13)。これにより waveform 以外の slice (将来の `pattern_library` 等) を追加しても schema 衝突しない。
+- pytest `test_library_id_not_top_level` (PR-S2) で固定。
 
 ---
 
@@ -333,8 +336,10 @@ slice の値が null + reason 付き は許容。reason だけ無く null は不
 - 結合済み trace を生成する場合は `runs/<run_id>/trace_joined.jsonl` を別途出す (再現可能 join)。
 - どのファイルも append-only。中身の編集禁止。
 - 文字コード: UTF-8。
-- 数値は IEEE 754 double。null は JSON null。
+- 数値は IEEE 754 double。null は JSON null。datetime は ISO 8601 文字列 (timezone-aware)。
 - `runs/` は .gitignore 済み (RISKS.md / .gitignore 参照)。
+- 実装: `kabu.trace_io.write_traces_jsonl(path, traces)` / `kabu.trace_io.read_traces_jsonl(path)` (PR-S2 で導入)。reader は record ごとに schema_version / 必須フィールド / dataclass バリデーションを実行する。
+- pytest `test_trace_jsonl_roundtrip` (PR-S2) で固定。
 
 ---
 
