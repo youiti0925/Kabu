@@ -1,0 +1,53 @@
+# Pre-commit hooks for Kabu (PR-S0.9 guardrails).
+#
+# Install:    pip install pre-commit && pre-commit install
+# Run all:    pre-commit run --all-files
+#
+# Policy references: docs/ANTI_FX_LEAK.md, docs/RISKS.md, docs/ROADMAP.md.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+
+  - repo: local
+    hooks:
+      - id: check-no-fx-leak
+        name: Check no FX-leak tokens (docs/ANTI_FX_LEAK.md)
+        entry: python scripts/check_no_fx_leak.py
+        language: system
+        pass_filenames: true
+        types_or: [python, markdown, toml, yaml, json, text]
+
+      - id: check-no-large-files
+        name: Check no files > 1MB
+        entry: python scripts/check_no_large_files.py
+        language: system
+        pass_filenames: true
+
+      - id: check-no-forbidden-paths
+        name: Check no runs/ libs/ data/raw/ data/cache/ or forbidden extensions
+        entry: python scripts/check_no_forbidden_paths.py
+        language: system
+        pass_filenames: true
+
+      - id: check-gitignore
+        name: Check .gitignore integrity
+        entry: python scripts/check_gitignore.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: check-secrets
+        name: Lightweight secret scan (heuristic; gitleaks is the long-term plan)
+        entry: python scripts/check_secrets.py
+        language: system
+        pass_filenames: true

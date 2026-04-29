@@ -142,12 +142,15 @@ Kabu の既知のリスクと限界。各 stats レポートと AI Review はこ
 ### 5-3. runs / libs / data の commit 事故
 
 - 説明: backtest 出力 / waveform library / 大容量 raw データを誤って commit。
-- 対策:
+- 対策 (PR-S0.9 で導入済み):
   - .gitignore で `runs/`, `libs/`, `data/raw/`, `data/cache/`, `*.parquet`, `*.duckdb`, `*.sqlite`, `*.csv`, `*.pkl`, `*.feather`, `.env`, `.venv/`, `__pycache__/`, `.pytest_cache/` を除外
-  - pre-commit hook: 1MB 超ファイルの commit 禁止 (将来導入予定)
-  - CI gate: PR diff にこれらが含まれていたら fail (将来導入予定)
-  - secret scan (gitleaks 等) を CI に組み込み (将来導入予定)
-  - anti-FX-leak grep を CI に組み込み (PR-S0.9 予定 → 詳細化後 CI 化)
+  - pre-commit hook で 1MB 超ファイルの commit を阻止 (`pre-commit-hooks.check-added-large-files` + `scripts/check_no_large_files.py`)
+  - CI (`.github/workflows/guardrails.yml`) で `runs/ libs/ data/raw/ data/cache/` 配下や `*.parquet` 等の追跡を検出する `scripts/check_no_forbidden_paths.py` を実行
+  - `scripts/check_gitignore.py` で `.gitignore` の必須エントリ抜けを検出
+  - `scripts/check_secrets.py` で軽量な secret スキャン (heuristic)
+- 後続強化 (将来 PR):
+  - secret scan は heuristic スクリプトを暫定運用。本格的には [gitleaks](https://github.com/gitleaks/gitleaks) もしくは detect-secrets を CI に組み込む
+  - `scripts/check_no_fx_leak.py` の禁止 token は段階的に拡張 (例: `BUY/SELL` 対称前提) し、`ruff` カスタムルール化を検討
 
 ### 5-4. schema 破壊的変更
 

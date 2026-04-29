@@ -1,0 +1,60 @@
+name: guardrails
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+permissions:
+  contents: read
+
+jobs:
+  guardrails:
+    name: policy guards + pytest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history so secret scanners can inspect prior commits
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install package and dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Check .gitignore integrity
+        run: python scripts/check_gitignore.py
+
+      - name: Check no forbidden paths / extensions
+        run: python scripts/check_no_forbidden_paths.py
+
+      - name: Check no oversized files (>1 MB)
+        run: python scripts/check_no_large_files.py
+
+      - name: Check no FX-leak tokens
+        run: python scripts/check_no_fx_leak.py
+
+      - name: Lightweight secret scan
+        run: python scripts/check_secrets.py
+        # Note: heuristic only. Plan: replace with gitleaks (docs/RISKS.md 5-3).
+
+      - name: pytest
+        # Tolerate "no tests collected" (exit 5) so CI stays green during the
+        # docs-only / guardrail-only stages. Uses `python -m pytest` to
+        # guarantee the same interpreter used by `pip install -e .`.
+        run: |
+          set +e
+          python -m pytest -ra
+          rc=$?
+          if [ $rc -eq 0 ] || [ $rc -eq 5 ]; then
+            exit 0
+          fi
+          exit $rc

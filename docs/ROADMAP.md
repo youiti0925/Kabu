@@ -83,16 +83,27 @@ Kabu の PR ロードマップと pytest 不変条件候補。承認は段階的
 
 ---
 
-## 5. CI / pre-commit 候補 (将来導入)
+## 5. CI / pre-commit (PR-S0.9 で導入済み + 将来拡張)
 
-PR-S0.9 で方針確定、PR-S0.9 / PR-S1 で順次導入。
+導入済み (PR-S0.9):
 
-- 1MB 超ファイルの commit 禁止 (pre-commit / CI)
-- `runs/` `libs/` `data/raw/` `data/cache/` 以下のファイルが diff に含まれていたら fail
-- secret scan (gitleaks 等)
-- anti-FX-leak grep (ANTI_FX_LEAK.md §3)
-- ruff / black / mypy の段階導入 (実装が始まったら)
-- pytest -ra を main protection とし、green 必須化
+- `.github/workflows/guardrails.yml` で push / pull_request 時に以下を実行
+  1. `scripts/check_gitignore.py` (.gitignore 必須エントリ抜け検出)
+  2. `scripts/check_no_forbidden_paths.py` (`runs/ libs/ data/raw/ data/cache/` および `*.parquet/*.duckdb/*.sqlite/*.csv/*.pkl/*.feather/.env` の追跡検出)
+  3. `scripts/check_no_large_files.py` (1MB 超ファイル検出)
+  4. `scripts/check_no_fx_leak.py` (ANTI_FX_LEAK.md §3 の禁止 token を `src/kabu/`, `tests/`, `docs/` で検出。allowlist: `docs/ANTI_FX_LEAK.md`, `docs/RISKS.md`, `README.md`)
+  5. `scripts/check_secrets.py` (heuristic secret scan)
+  6. `pytest -ra` (テスト未収集 = exit 5 を許容)
+- `.pre-commit-config.yaml` で同等のチェックを pre-commit でも実行
+  - `pre-commit-hooks` の `end-of-file-fixer` / `trailing-whitespace` / `check-merge-conflict` / `check-yaml` / `check-toml` / `check-added-large-files` / `detect-private-key`
+  - 上記 5 つの local hook
+
+将来拡張:
+
+- secret scan の本格化 (gitleaks / detect-secrets を CI に組み込み。RISKS.md 5-3)
+- ANTI_FX_LEAK.md §3 の `BUY/SELL` 対称前提など意味論的禁止の追加
+- ruff / black / mypy の段階導入 (実装が始まる PR-S1 以降)
+- main / develop 等のブランチ保護を guardrails.yml の green を必須にする
 
 ---
 
