@@ -71,11 +71,14 @@ CALENDAR.md §0 D-8 / §6 を不変条件として反映。
 
 ### 3-7. decision builder の入力制約 (決定)
 
-SCHEMA.md §0 D-11 / §4-10 と連動。
+SCHEMA.md §0 D-11 / §4-10 / BACKTEST_CONTRACT.md §0 D-18 と連動。
 
 - `future_outcome.*` を decision builder / risk builder / execution_assumption builder の **入力に含めない**。
 - 型シグネチャレベルで強制する。`kabu.decision_trace_build.build_trace(...)` (PR-S2 で導入) は signature に `future_outcome` を持たず、`*` で keyword-only。`future_outcome=...` を渡すと `TypeError`。
-- `build_trace` が返す `Trace` の `slices.future_outcome` は常に `None`。post-processing (PR-S3 / S4) で別経路から enrich する。
+- `build_trace` が返す `Trace` の `slices.future_outcome` は常に `None`。
+- **post-processing は別モジュール**: `kabu.outcome.enrich_future_outcomes` (PR-S3 で導入) が `(traces, bars_by_symbol, *, horizon_bars, forward_return_basis)` を受け取り `OutcomeBackfillRecord` を返す。これは `decision_trace_build` から import されない (pytest `test_decision_trace_build_does_not_import_outcome` で固定)。
+- 出力先は **trace_raw とは別の JSONL** (`outcome_backfill.jsonl`)。pytest `test_backfill_jsonl_path_must_differ_from_trace_raw` (PR-S3) で固定。
+- `kabu.outcome.join_traces_with_outcomes` で `Trace` を新しい instance として再構築 (immutable 維持) し、`slices.future_outcome` を埋める。
 - pytest `test_decision_does_not_depend_on_outcome` (PR-S2) で、builder の引数仕様 (typing / inspect.signature) を確認する。
 
 ---

@@ -4,24 +4,28 @@ backtest の約定タイミング・コスト・調整方針の契約。MVP は 
 
 ---
 
-## 0. MVP 決定 (PR-S0.5 / N2 で確定)
+## 0. MVP 決定 (PR-S0.5 / N2 で確定 + PR-S3 で実装)
 
 本セクションは「決定」であり、後続 PR は本決定に従う。変更には別途承認が必要。
 
 - D-1. **MVP は long_only / 現物相当のみ**。空売り・信用は MVP 外。
 - D-2. **税前 PnL** (`tax_basis = "pretax"`)。配当税 / 譲渡税は将来課題。
-- D-3. **decision at T close → fill at T+1 open** (CALENDAR.md §0 D-3 / D-4 と整合)。
-- D-4. **same close fill (T close で約定) は MVP では禁止** (CALENDAR.md §0 D-5)。
+- D-3. **decision at T close → fill at T+1 open** (CALENDAR.md §0 D-3 / D-4 と整合)。PR-S3 の `kabu.backtest.engine.run_backtest` で構造的に強制。
+- D-4. **same close fill (T close で約定) は MVP では禁止** (CALENDAR.md §0 D-5)。`assumed_fill_bar="same_close"` 等を渡すと engine が `ValueError` で拒否。pytest `test_same_close_fill_forbidden` で固定。
 - D-5. `execution_assumption.assumed_fill_bar = "next_open"` を **必須** で持つ。
-- D-6. `execution_assumption.latency_bars = 1` を **必須** で持つ。
-- D-7. `slippage_bps` を `run_metadata.costs.slippage_bps` に **必ず保存**。
+- D-6. `execution_assumption.latency_bars = 1` を **必須** で持つ。engine も `latency_bars != 1` を `ValueError` で拒否。
+- D-7. `slippage_bps` を `run_metadata.costs.slippage_bps` に **必ず保存**。pytest `test_fee_and_slippage_applied` で fill price への反映を確認。
 - D-8. `fee_bps` および `fee_fixed_jpy` を `run_metadata.costs.fee_bps` / `run_metadata.costs.fee_fixed_jpy` に **必ず保存**。
-- D-9. **technical / long_term_trend / waveform 計算は adj_close 系列、約定価格 (fill_price) は raw 系列**。詳細実装の境界は PR-S1 / PR-S3 で再確認。
-- D-10. 売買単位 (lot_size) は **100 株を MVP の基本** とするが、PR-S3 実装前に再確認 (例外銘柄の扱い)。
-- D-11. 出来高フロア / 売買代金フロアは **PR-S3 で導入**。MVP は導入直後の閾値 (volume_floor_ratio = 1%, min_avg_turnover_jpy = 1 億 等) は仮置きで運用し、要承認後に確定。
-- D-12. ストップ高 / ストップ安 / 特別気配 / 売買停止は **fill 不可または保守的処理**。PR-S3 で実装。
-- D-13. `run_metadata` の必須項目は §7 を参照。これらが揃わない run は出力しない (pytest `test_run_metadata_required` で検証)。
+- D-9. **technical / long_term_trend / waveform 計算は adj_close 系列、約定価格 (fill_price) は raw 系列**。PR-S3 engine の `compute_long_entry_fill_price` は raw open のみを参照。pytest `test_dividend_ex_day_handling` で簡易確認。
+- D-10. 売買単位 (lot_size) は **100 株を MVP の基本**。PR-S3 engine の `target_jpy_per_trade // entry_price // lot_size * lot_size` で量を計算。下限未満は `below_lot_size` で skip。
+- D-11. 出来高フロア / 売買代金フロアは **PR-S3 で導入**。`min_volume` / `min_turnover_jpy` で表現。違反時は `volume_zero` / `volume_floor` / `turnover_zero` / `turnover_floor` の reason で skip。pytest `test_volume_floor_cap` で固定。
+- D-12. ストップ高 / ストップ安 / 特別気配 / 売買停止は **fill 不可または保守的処理**。PR-S3 では `OHLCBar.is_halted / is_special_quote / is_circuit_breaker` の bar フラグ proxy で判定 (`kabu.backtest.checks.is_unfillable`)。pytest `test_stop_high_low_block`。正確な制限値幅 table は後続 PR。
+- D-13. `run_metadata` の必須項目は §7 を参照。これらが揃わない run は出力しない (pytest `test_run_metadata_required` で検証)。`kabu.run_metadata_io.read_run_metadata_json` が必須キー欠落で `ValueError`。
 - D-14. `currency = "JPY"` 固定 / `report_currency = "JPY"` 固定 (DATA_SOURCES.md §0 D-2)。
+- D-15. **PR-S3 の action は engine 検証用 placeholder** (`enter_long`, `exit_long`, `no_position`, `observe_only`)。これは **売買ルールではない / 銘柄推奨ではない**。`buy / sell_to_close` 文字列も engine が受け取れるが「テスト用 action 表現」。実戦ルール化は別 PR で別承認が必要。
+- D-16. **`trace_jsonl_path` は Trade に必須**。PR-S3 engine が全 Trade に stamp。pytest `test_trace_jsonl_path_required_for_trades` で固定。
+- D-17. **`survivorship_policy` は run_metadata に必須**。pytest `test_survivorship_policy_recorded` で固定。
+- D-18. **future_outcome は post-processing**。`kabu.outcome.enrich_future_outcomes` で別経路として実装。`kabu.decision_trace_build.build_trace` から import / 引数受け取り 共に禁止。pytest `test_decision_does_not_depend_on_outcome` (PR-S2) と `test_future_outcome_backfill_separate_from_raw_trace` (PR-S3) で固定。`outcome_backfill.jsonl` は `trace_raw.jsonl` と **別ファイル**。
 
 ---
 

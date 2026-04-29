@@ -37,6 +37,11 @@ class OHLCBar:
     volume: int
     turnover: float
     prev_close: float | None = None
+    # Halt / circuit-breaker flags. PR-S3 backtest engine uses these as a
+    # conservative proxy for fillability (BACKTEST_CONTRACT.md S0 D-12).
+    is_halted: bool = False
+    is_special_quote: bool = False
+    is_circuit_breaker: bool = False
 
     def __post_init__(self) -> None:
         for name in ("bar_ts", "bar_ts_close", "bar_ts_available"):
