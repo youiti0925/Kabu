@@ -4,6 +4,24 @@
 
 ---
 
+## 0. MVP 決定 (PR-S0.5 / N2 で確定)
+
+本セクションは「決定」であり、後続 PR は本決定に従う。変更には別途承認が必要。
+
+- D-1. 初期対象市場は **日本株のみ**。米国株 / 海外個別株 / 海外 ETF / ADR は MVP 対象外。
+- D-2. `currency = "JPY"` 固定。`run_metadata.report_currency = "JPY"` 固定。為替換算 PnL は MVP 対象外。
+- D-3. PR-S1 では **Source Protocol を先に作る**。具体的なベンダ実装はこの裏に閉じ込める。アプリ全体から `yfinance` / `Stooq` / 他ベンダを直接呼ぶことは禁止。
+- D-4. 全データアクセサは `as_of: datetime` を **必須引数** にする。デフォルト「今」は禁止 (POINT_IN_TIME.md §3 / §5 と整合)。
+- D-5. `run_metadata.data_source` および `run_metadata.data_source_version` を **必ず保存** する。
+- D-6. `fundamental_ctx` は **MVP では実装しない**。null で出すこともしない (= slice 自体を出さないか、`unavailable_reason="pit_not_available"` で全フィールド null)。
+- D-7. PR-S8 (`fundamental_ctx`) は **PIT fundamentals が確保できるまで着手不可**。これは前提条件であり、N2 / PR-S0.5 / PR-S0.7 / PR-S0.9 / PR-S1 で覆さない。
+- D-8. AI Review (PR-S10) は PIT fundamentals が無い場合、**ファンダ由来のルール変更候補 (Cカテゴリ) を出さない**。AI_REVIEW_SAFETY.md §10 と整合。
+- D-9. 主要指数 (S&P500 / NASDAQ / VIX) は時差ありで使う場合、CALENDAR.md §6 のルール (T 日の日本株判断時点で見えていた値だけを使う) を必ず守る。
+
+具体ベンダの最終選定 (yfinance vs J-Quants vs 自社蓄積 vs 有償) は §10 のチェックリスト未確定枠として残す。PR-S1 では Protocol 定義 + 単一の参照実装 (差し替え可能) を入れる。
+
+---
+
 ## 1. 必要データの全体像
 
 | カテゴリ | 必要項目 | MVP対象 | 備考 |
@@ -39,14 +57,22 @@
 
 ---
 
-## 3. MVP の暫定方針
+## 3. MVP 決定 (採用範囲)
 
-確定は §6 のチェックリストでユーザ承認を得てから行う。本 §3 は採用候補と運用前提を整理するだけで、実装の前提固定ではない。
+§0 を踏まえた具体的な MVP スコープ。
 
-候補:
-- 価格 / 出来高 / 銘柄メタ / 営業日 / 主要指数: yfinance を「実装試行用」として候補。J-Quants を「本命」として候補。
-- fundamentals / earnings / news: PIT を保証できるソース確定までは MVP に入れない。
-- 海外株 (米株 / 海外指数): MVP では「指数のみ」。個別米株は PR-S8 以降の課題。
+- 採用 (MVP):
+  - 日本株の OHLCV (raw + adjusted) / volume / turnover
+  - 銘柄メタ (symbol / market / sector / listing_date / delisting_date / lot_size / tick_size)
+  - 営業日カレンダー (CALENDAR.md と整合)
+  - 主要指数: 日経225 / TOPIX / グロース250 (日本側)
+  - 主要指数: S&P500 / NASDAQ / VIX / USDJPY / 10Y (時差は CALENDAR.md §6 のルールで参照)
+- 不採用 (MVP):
+  - fundamentals / earnings / news (D-6 / D-7 参照)
+  - 海外個別株
+  - 信用残 / 浮動株 / 外国人保有 / セクターローテーション指数 等
+
+実装ベンダ候補は §2 を参照。§10 のチェックリストでユーザが選定。PR-S1 では選定確定までは Protocol + 単一の参照実装にとどめ、実データ取得処理の本格実装は行わない。
 
 ---
 
@@ -83,25 +109,31 @@
 
 ---
 
-## 6. PIT fundamentals が無い場合の方針
+## 6. PIT fundamentals が無い場合の方針 (決定)
 
-- PR-S8 (fundamental_ctx) は PIT を保証するソースを採用するまで着手しない。
-- それまでは `fundamental_ctx` を null で出すこと **すら** しない (空 slice 自体を schema から外す or `unavailable_reason="pit_not_available"` で全フィールド null)。
+§0 D-6 / D-7 / D-8 を実装契約として展開する。
+
+- PR-S8 (`fundamental_ctx`) は PIT を保証するソースを採用するまで **着手しない** (D-7)。
+- それまでは `fundamental_ctx` を null で出すこと **すら** しない (空 slice 自体を schema から外す or `unavailable_reason="pit_not_available"` で全フィールド null) (D-6)。
 - どちらの形でも、stats / AI Review はその slice を集計対象から除外する。
-- `analyst.py` (PR-S10) のプロンプトに「PIT が確認されていない fundamentals を根拠に提案を作らない」を組み込む。
+- `analyst.py` (PR-S10) のプロンプトに「PIT が確認されていない fundamentals を根拠に提案を作らない」を組み込む (D-8)。
+- run_metadata に `warnings` 配列を持ち、`"pit_fundamentals_disabled"` を MVP 期間中は必ず含める。
 
 ---
 
-## 7. 取得・キャッシュ層の設計指針
+## 7. 取得・キャッシュ層の設計指針 (決定 + 実装契約)
 
-実装は別 PR (PR-S1) だが、契約はここで固定する。
+実装は PR-S1 で行うが、契約はここで固定する (§0 D-3 / D-4 / D-5)。
 
-- `Source` を Protocol として定義 (例: `class Source(Protocol): def get_ohlcv(symbol, start, end, *, as_of) -> DataFrame`)。
-- 実装は `YFinanceSource` / `JQuantsSource` 等のクラスでベンダ差を吸収。`data.py` 直叩きは禁止。
+- `Source` を Protocol として定義 (例: `class Source(Protocol): def get_ohlcv(symbol, start, end, *, as_of) -> DataFrame`)。**Protocol を先に作り、ベンダ実装はその裏に閉じ込める。**
+- 実装は `YFinanceSource` / `JQuantsSource` 等のクラスでベンダ差を吸収。`data.py` 直叩きは禁止。アプリ全体から具体ベンダ名を呼ばない。
+- 全データアクセサに `as_of: datetime` を必須引数で持たせる。デフォルト値は禁止 (signature レベルで強制)。
 - ローカルキャッシュは `data/cache/` 配下に parquet by symbol-date で immutable layout。上書き禁止 / 追記のみ。
 - `data/raw/` はベンダから取得した生データを captured_at 付きで保存 (将来 PIT 再現のため)。
+- `data/raw/` `data/cache/` は CI / .gitignore で commit が構造的に阻止されている (RISKS.md 5-3 / scripts/check_no_forbidden_paths.py)。
 - cache の hit/miss は run_metadata に統計として残す (`data_cache_stats`)。
 - ベンダ間でカラム名 / 型を必ず正規化する。caller はベンダ名を知らない。
+- `run_metadata.data_source` および `run_metadata.data_source_version` は必須 (D-5)。データソース変更は破壊的変更扱い。
 
 ---
 
@@ -126,14 +158,29 @@
 
 ---
 
-## 10. 採用前チェックリスト (要決定)
+## 10. チェックリスト
 
-- [ ] 価格データソースは何を使うか (yfinance / J-Quants / 自社蓄積 / 併用)
+### 10-1. 決定済 (N2 / PR-S0.5 で確定)
+
+- [x] 初期対象市場: 日本株のみ (D-1)
+- [x] 通貨: JPY 固定 (D-2)
+- [x] 海外株 / ADR / 海外 ETF の扱い: MVP 対象外 (D-1)
+- [x] PR-S1 では Source Protocol を先に作る (D-3)
+- [x] アプリ全体からベンダ直叩き禁止 (D-3)
+- [x] `as_of` 引数必須 / デフォルト「今」禁止 (D-4)
+- [x] `run_metadata.data_source` / `data_source_version` 必須 (D-5)
+- [x] fundamentals は MVP 実装しない (D-6)
+- [x] PR-S8 は PIT fundamentals 確保まで未着手 (D-7)
+- [x] AI Review はファンダ由来の C 提案を出さない (D-8)
+- [x] 米国指数の時差ルール (CALENDAR.md §6) に従う (D-9)
+
+### 10-2. 未確定 (PR-S1 着手前にユーザ承認が必要)
+
+- [ ] 価格データソースの最終ベンダ (yfinance / J-Quants / 自社蓄積 / 併用)
 - [ ] 主要指数のソース (Stooq / yfinance / 公式)
-- [ ] fundamentals / earnings の PIT ソース (J-Quants / 有償 / なし)
-- [ ] ニュースソース (PR-S9 まで保留可だが候補は検討)
-- [ ] 海外株を扱うか (扱う場合は通貨換算方針)
-- [ ] キャッシュ format (parquet / duckdb)
-- [ ] ベンダ規約の確認結果
+- [ ] fundamentals / earnings の PIT ソース (PR-S7 / S8 着手前まで延期可)
+- [ ] ニュースソース (PR-S9 まで延期可)
+- [ ] キャッシュ format (parquet 推奨 / duckdb 検討)
+- [ ] ベンダ規約の確認結果 (商用利用 / レート制限 / アカウント要件)
 
-これらが確定するまで PR-S1 (data source interface) は具体的な vendor を選ばず、Protocol 定義と yfinance の stub 実装にとどめる。
+10-2 が確定するまで PR-S1 (data source interface) は具体的な vendor を選ばず、Protocol 定義 + 単一の参照実装 (差し替え可能、stub 相当) にとどめる。

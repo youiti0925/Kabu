@@ -61,6 +61,22 @@ look-ahead bias を構造で防ぐための point-in-time (PIT) 運用契約。�
 - 任意の bar_ts に対するシグナル対象は、`universe_snapshot_id` の `effective_from <= bar_ts.date() AND (effective_to is null OR bar_ts.date() < effective_to)` を満たす銘柄に限る。
 - pytest `test_universe_snapshot_consistency` で検証 (UNIVERSE.md / SURVIVORSHIP.md と整合)。
 
+### 3-6. 海外指数の時差 (決定)
+
+CALENDAR.md §0 D-8 / §6 を不変条件として反映。
+
+- 米国指数 / NASDAQ / S&P500 / VIX / USDJPY / 米10Y のような **米国セッション系列** を `market_index_ctx` に入れる場合、その値は **`as_of <= bar_ts_available[T]` を満たす直近の米国セッション終値** を使う。
+- 日本 T 日 bar に **米国 T 日終値** を入れてはならない (= 米国 T 日終値は日本 T+1 日朝以降にしか公開されないため、日本 T 日大引け時点では未確定 / 未公開 / look-ahead に該当)。
+- pytest 候補 `test_us_index_no_lookahead` (PR-S5) で「日本 T 日 bar の `market_index_ctx` の米国指数値が、米国 T-1 日以前のセッション終値であること」を検証する。
+
+### 3-7. decision builder の入力制約 (決定)
+
+SCHEMA.md §0 D-11 / §4-10 と連動。
+
+- `future_outcome.*` を decision builder / risk builder / execution_assumption builder の **入力に含めない**。
+- 型シグネチャレベルで強制する。`build_decision_slice(market, technical, long_term_trend, ..., bar_ts) -> DecisionSlice` のような関数に future_outcome を渡せないようにする。
+- pytest `test_decision_does_not_depend_on_outcome` (PR-S2) で、builder の引数仕様 (typing 経由) を確認する。
+
 ---
 
 ## 4. 反映タイミングのルール

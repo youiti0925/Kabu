@@ -4,28 +4,56 @@ backtest の約定タイミング・コスト・調整方針の契約。MVP は 
 
 ---
 
-## 1. 基本方針
+## 0. MVP 決定 (PR-S0.5 / N2 で確定)
 
-- MVP は long_only / 現物相当のみ。空売り・信用は MVP 外。
-- 通貨は JPY 固定 (currency=JPY)。海外株は MVP 外。
-- bar interval は `1d` のみ。intraday は将来。
+本セクションは「決定」であり、後続 PR は本決定に従う。変更には別途承認が必要。
+
+- D-1. **MVP は long_only / 現物相当のみ**。空売り・信用は MVP 外。
+- D-2. **税前 PnL** (`tax_basis = "pretax"`)。配当税 / 譲渡税は将来課題。
+- D-3. **decision at T close → fill at T+1 open** (CALENDAR.md §0 D-3 / D-4 と整合)。
+- D-4. **same close fill (T close で約定) は MVP では禁止** (CALENDAR.md §0 D-5)。
+- D-5. `execution_assumption.assumed_fill_bar = "next_open"` を **必須** で持つ。
+- D-6. `execution_assumption.latency_bars = 1` を **必須** で持つ。
+- D-7. `slippage_bps` を `run_metadata.costs.slippage_bps` に **必ず保存**。
+- D-8. `fee_bps` および `fee_fixed_jpy` を `run_metadata.costs.fee_bps` / `run_metadata.costs.fee_fixed_jpy` に **必ず保存**。
+- D-9. **technical / long_term_trend / waveform 計算は adj_close 系列、約定価格 (fill_price) は raw 系列**。詳細実装の境界は PR-S1 / PR-S3 で再確認。
+- D-10. 売買単位 (lot_size) は **100 株を MVP の基本** とするが、PR-S3 実装前に再確認 (例外銘柄の扱い)。
+- D-11. 出来高フロア / 売買代金フロアは **PR-S3 で導入**。MVP は導入直後の閾値 (volume_floor_ratio = 1%, min_avg_turnover_jpy = 1 億 等) は仮置きで運用し、要承認後に確定。
+- D-12. ストップ高 / ストップ安 / 特別気配 / 売買停止は **fill 不可または保守的処理**。PR-S3 で実装。
+- D-13. `run_metadata` の必須項目は §7 を参照。これらが揃わない run は出力しない (pytest `test_run_metadata_required` で検証)。
+- D-14. `currency = "JPY"` 固定 / `report_currency = "JPY"` 固定 (DATA_SOURCES.md §0 D-2)。
+
+---
+
+## 1. 基本方針 (決定)
+
+§0 を反映した基本方針。
+
+- MVP は long_only / 現物相当のみ (D-1)。空売り・信用は MVP 外。
+- 通貨は JPY 固定 (`currency = "JPY"` / `report_currency = "JPY"`) (D-14)。海外株は MVP 外。
+- bar interval は `1d` のみ (CALENDAR.md §0 D-1)。intraday は将来。
+- 税前 PnL (D-2)。`run_metadata.tax_basis = "pretax"` を必ず保存。
 - 単一銘柄 backtest は portfolio size = 1 の特殊例として実装する (将来の portfolio 拡張に備える)。
 
 ---
 
-## 2. 約定タイミング契約
+## 2. 約定タイミング契約 (決定)
+
+§0 D-3 / D-4 / D-5 / D-6 を実装契約として展開する。
 
 ### 2-1. decision timing
 
-- 判定: 当日 (T) の close 確定後、すなわち `bar_ts_close[T]` 以降。
+- 判定: 当日 (T) の close 確定後、すなわち `bar_ts_close[T]` 以降 (D-3)。
 - close 確定は CALENDAR.md の半日立会等を考慮した `bar_ts_close` を使う。
+- decision builder は **future_outcome を入力に取らない** (POINT_IN_TIME.md §3-4 / SCHEMA.md §4-10)。
 
 ### 2-2. fill timing
 
-- 約定: 翌営業日 (T+1) の寄付。
-- すなわち `assumed_fill_bar = "next_open"`、`latency_bars = 1` を MVP 固定。
-- same close fill (T close で約定) は **MVP では使わない**。look-ahead と区別がつかなくなるため。
-- 翌営業日が祝日 / 半日立会の場合は `next_business_day(T+1)` を使う (CALENDAR.md)。
+- 約定: 翌営業日 (T+1) の寄付 (D-3)。
+- `assumed_fill_bar = "next_open"` を **必須** で trace に持つ (D-5)。
+- `latency_bars = 1` を **必須** で trace に持つ (D-6)。
+- same close fill (T close で約定) は **MVP では禁止** (D-4)。look-ahead と区別がつかなくなるため。
+- 翌営業日が祝日 / 半日立会の場合は `next_business_day(T+1)` を使う (CALENDAR.md §1 / §4)。
 
 ### 2-3. fill_price
 
@@ -116,44 +144,52 @@ backtest の約定タイミング・コスト・調整方針の契約。MVP は 
 
 ---
 
-## 6. 調整済 vs 未調整 価格の使い分け
+## 6. 調整済 vs 未調整 価格の使い分け (決定)
 
-| 用途 | 系列 |
-|---|---|
-| technical / long_term_trend / waveform 計算 | adj_close (split & dividend back-adjusted) |
-| 約定価格 (fill_price) | raw open / close |
-| 出来高比較 (turnover_zscore 等) | turnover (= raw price × volume) ベース |
-| ギャップ計算 (gap_pct) | raw close → raw open |
-| 表示用 chart | 用途で選択。SCHEMA は両系列を保持 |
+§0 D-9 を実装契約として展開する。詳細境界は PR-S1 (indicators) / PR-S3 (backtest) で再確認。
 
-`technical.adjustment_basis = "split_dividend_back_adjusted"` を v1 で固定する。
+| 用途 | 系列 | 備考 |
+|---|---|---|
+| technical / long_term_trend / waveform 計算 | **adj_close** (split & dividend back-adjusted) | `technical.adjustment_basis = "split_dividend_back_adjusted"` を必須 (SCHEMA.md §4-2) |
+| 約定価格 (fill_price) | **raw** open / close | tick_size に丸める |
+| 出来高比較 (turnover_zscore 等) | turnover (= raw price × volume) ベース | turnover は調整係数の影響が比較的小さい |
+| ギャップ計算 (gap_pct) | raw close → raw open | `market.prev_close` と `market.open` から計算 |
+| 表示用 chart | 用途で選択 | SCHEMA は両系列を保持 |
+
+`technical.adjustment_basis = "split_dividend_back_adjusted"` を v1 で固定する (SCHEMA.md §4-2)。これは schema の **必須** フィールド。
 
 ---
 
-## 7. run_metadata に必ず残す項目
+## 7. run_metadata に必ず残す項目 (決定)
 
-- run_id
-- commit_sha
-- created_at
-- data_source / data_source_version
-- data_snapshot_hash
-- universe_snapshot_id
-- survivorship_policy
-- survivorship_warning
-- calendar_id
-- trace_schema_version
-- interval
-- period (start_ts, end_ts)
-- costs: { fee_bps, fee_fixed_jpy, slippage_bps }
-- volume_floor_ratio
-- min_avg_turnover_jpy
-- assumed_fill_bar ("next_open")
-- latency_bars (1)
-- tax_basis ("pretax")
-- rule_id / rule_version / rule_params_hash (judgement に使った placeholder ルール)
-- warnings[] (例: "static_current_listing_universe", "pit_fundamentals_disabled")
-- unavailable_reason_summary
-- library_ids[] (waveform 等を使った場合)
+§0 D-13 / D-7 / D-8 を実装契約として展開する。
+
+- `run_id`
+- `commit_sha`
+- `created_at`
+- `data_source` / `data_source_version` (DATA_SOURCES.md §0 D-5)
+- `data_snapshot_hash`
+- `universe_snapshot_id` (UNIVERSE.md §0 D-7)
+- `survivorship_policy` (UNIVERSE.md §0 D-4)
+- `survivorship_warning` (UNIVERSE.md §0 D-4)
+- `calendar_id`
+- `trace_schema_version` (SCHEMA.md §1)
+- `interval` (CALENDAR.md §0 D-1 / SCHEMA.md §2)
+- `currency` = "JPY" (DATA_SOURCES.md §0 D-2)
+- `report_currency` = "JPY" (DATA_SOURCES.md §0 D-2)
+- `period` (`start_ts`, `end_ts`)
+- `costs`: `{ fee_bps, fee_fixed_jpy, slippage_bps }` (D-7 / D-8)
+- `volume_floor_ratio`
+- `min_avg_turnover_jpy`
+- `assumed_fill_bar` = "next_open" (D-5)
+- `latency_bars` = 1 (D-6)
+- `tax_basis` = "pretax" (D-2)
+- `rule_id` / `rule_version` / `rule_params_hash` (judgement に使った placeholder ルール)
+- `warnings[]` (例: `"static_current_listing_universe"`, `"pit_fundamentals_disabled"`)
+- `unavailable_reason_summary`
+- `libraries[]`: `[{slice, library_id, library_kind, feature_set}]` (waveform 等を使った場合。SCHEMA.md §0 / §2 と整合)
+
+これらが満たされない run は出力しない。pytest `test_run_metadata_required` (PR-S3) で検証する。
 
 ---
 
@@ -180,17 +216,34 @@ backtest の約定タイミング・コスト・調整方針の契約。MVP は 
 
 ---
 
-## 10. 要決定チェックリスト
+## 10. チェックリスト
+
+### 10-1. 決定済 (N2 / PR-S0.5 で確定)
+
+- [x] long_only / 現物相当 (D-1)
+- [x] 税前 PnL (D-2)
+- [x] decision at T close → fill at T+1 open (D-3)
+- [x] same close fill 禁止 (D-4)
+- [x] assumed_fill_bar / latency_bars 必須 (D-5 / D-6)
+- [x] slippage_bps / fee_bps / fee_fixed_jpy を run_metadata に必須保存 (D-7 / D-8)
+- [x] technical = adj / fill = raw (D-9)
+- [x] currency = JPY 固定 / report_currency = JPY 固定 (D-14)
+- [x] 売買単位は MVP の基本 = 100 株 (D-10。例外確認は PR-S3 着手前)
+- [x] 出来高フロア / 売買代金フロアは PR-S3 で導入 (D-11。閾値は PR-S3 着手前にユーザ承認)
+- [x] ストップ高安 / 特別気配 / 売買停止は fill 不可または保守的処理 (D-12。PR-S3 で実装)
+
+### 10-2. 未確定 (PR-S3 着手前にユーザ承認が必要)
 
 - [ ] fee_bps / fee_fixed_jpy のデフォルト値
 - [ ] slippage_bps のデフォルト値
 - [ ] volume_floor_ratio のデフォルト値
 - [ ] min_avg_turnover_jpy のデフォルト値
-- [ ] 上場廃止時の強制決済価格 (last_known_close / 0 / 比率)
-- [ ] 単元未満の取扱 (許可するか)
+- [ ] 上場廃止時の強制決済価格 (`last_known_close` / `0` / 比率)
+- [ ] 単元未満の取扱 (基本は不可だが例外運用の可否)
 - [ ] `volume_split_adjusted` を保持するか
 - [ ] tick_size table のソース
 - [ ] 制限値幅 table のソース
+- [ ] `outcome_label` のしきい値方式 (`static` / `atr_norm` / 両併存)
 
 ---
 

@@ -4,6 +4,23 @@
 
 ---
 
+## 0. MVP 決定 (PR-S0.5 / N2 で確定)
+
+本セクションは「決定」であり、後続 PR は本決定に従う。変更には別途承認が必要。
+
+- D-1. 初期ユニバースは **MVP-1: 自由銘柄リスト** とする (ユーザが明示した数十銘柄)。
+- D-2. MVP-2 候補 (日経225 / TOPIX500 / グロース主要銘柄) は historical membership ソース確定までは MVP に入れない。
+- D-3. ETF / REIT / ADR / 種類株は MVP では除外。`instrument_type ∈ {"common_stock"}` でフィルタ。
+- D-4. historical universe が無い場合、`run_metadata.survivorship_policy = "static_current_listing"` を **必ず保存** し、`run_metadata.survivorship_warning = true` を **必ず保存** する。
+- D-5. stats レポート / AI Review の冒頭に **survivorship warning を必ず表示** する。
+- D-6. AI Review は survivorship-biased 状態 (D-4 該当) では **Cカテゴリ (ルール変更候補) を出さない**。AI_REVIEW_SAFETY.md §9 と整合。
+- D-7. `run_metadata.universe_snapshot_id` を必須化 (SCHEMA.md と整合)。
+- D-8. 初期 universe の格納先は `data/universe/` (将来)。MVP では実 CSV はコミットしない。サンプル雛形だけ docs に書き、実データ投入は後続 PR でユーザ承認後。
+
+D-1 / D-3 は MVP-1 開発時の前提。historical universe 採用後は D-4 / D-5 を `survivorship_policy = "historical"` に切り替え可能。
+
+---
+
 ## 1. ユニバースとは
 
 - 「いつ、どの銘柄を検証対象に含めるか」の集合。
@@ -12,19 +29,37 @@
 
 ---
 
-## 2. 初期ユニバース候補
+## 2. 初期ユニバース候補と MVP 決定
 
-| 名前 | 規模 | 採用候補 | 備考 |
+| 名前 | 規模 | MVP 採用 | 備考 |
 |---|---|---|---|
-| 日経225 | 大型中心 | yes (有力候補) | historical membership が比較的取れる |
-| TOPIX500 | 中大型 | yes | グロース・バリュー両方を含む |
-| グロース市場 (グロース250 含む) | 小型中心 | 検討 | 流動性が極端に低い銘柄を含むため liquidity_floor が必要 |
-| 全上場銘柄 | 約 4000 | MVP では除外 | データ量・survivorship 管理コスト大 |
-| 自由銘柄リスト (ユーザ指定) | 任意 | yes (デバッグ用) | 例: 数十銘柄から始める |
-| 米株 (S&P500 等) | 大型中心 | MVP では除外 | 通貨換算 / 営業日が別 |
-| ETF / REIT / ADR | 別カテゴリ | MVP では除外 | 配当 / 分配 / 調整方法が異なる |
+| **自由銘柄リスト (ユーザ指定)** | 任意 | **MVP-1 採用 (決定)** | §0 D-1。数十銘柄から始める。CSV はコミットしない (D-8) |
+| 日経225 | 大型中心 | MVP-2 候補 | historical membership ソース採用後 |
+| TOPIX500 | 中大型 | MVP-2 候補 | historical membership ソース採用後 |
+| グロース市場 (グロース250 含む) | 小型中心 | MVP-2 候補 | 流動性が極端に低い銘柄を含むため liquidity_floor が必要 |
+| 全上場銘柄 | 約 4000 | MVP 除外 | データ量・survivorship 管理コスト大 |
+| 米株 (S&P500 等) | 大型中心 | MVP 除外 (D-1 / DATA_SOURCES.md) | 通貨換算 / 営業日が別 |
+| ETF / REIT / ADR | 別カテゴリ | MVP 除外 (D-3) | 配当 / 分配 / 調整方法が異なる |
 
-MVP の推奨は「自由銘柄リスト (数十銘柄)」または「日経225」のどちらか。確定は要承認。
+### 2-1. MVP-1 自由銘柄リストのスキーマ (サンプル)
+
+実 CSV は `data/universe/manual_symbols.csv` を想定。`data/raw/` 配下ではなく、`data/universe/` 配下に置く想定 (PR-S1 着手時に確定)。docs にはサンプル雛形のみ。実データはコミットしない。
+
+```
+# data/universe/manual_symbols.example.csv (雛形 / 実データではない)
+symbol,name,market,sector,effective_from,effective_to
+7203,トヨタ自動車,TSE_PRIME,輸送用機器,2010-01-01,
+6758,ソニーグループ,TSE_PRIME,電気機器,2010-01-01,
+9984,ソフトバンクグループ,TSE_PRIME,情報通信,2010-01-01,
+```
+
+- ヘッダ: `symbol, name, market, sector, effective_from, effective_to`
+- `effective_to` が空 = 現時点で active。
+- 上場廃止 / 市場区分変更時は新しい行を追加し、旧行の `effective_to` を埋める。
+- 文字コードは UTF-8。
+- このスキーマは MVP-1 の最小契約。lot_size / tick_size_table_id / listing_date / delisting_date は §4 のフルスキーマで保持。
+
+MVP-2 (日経225 / TOPIX500 / グロース) は historical membership が確保されるまで PR を開かない。
 
 ---
 
@@ -75,14 +110,18 @@ universe_snapshot:
 
 ---
 
-## 6. MVP で historical universe が無い場合の方針
+## 6. MVP で historical universe が無い場合の方針 (決定)
+
+§0 D-4 / D-5 / D-6 を実装契約として展開する。
 
 - 暫定で「現在の上場銘柄リスト」をユニバースとして使うことを **許容するが、警告必須** とする。
-- run_metadata に以下を保存:
+- run_metadata に以下を **必ず** 保存 (D-4):
   - `survivorship_policy: "static_current_listing"` (= 現在の上場銘柄のみ。survivorship-biased)
   - `survivorship_warning: true`
-- stats レポート / AI Review の冒頭に「結果は survivorship-biased である」旨を必ず表示する。
-- 上記は MVP 限定の妥協。PR-S0.5 で historical universe を提供するソースを採用したら直ちに切替。
+- stats レポート / AI Review の冒頭に「結果は survivorship-biased である」旨を **必ず** 表示する (D-5)。
+- AI Review は本状態下で **Cカテゴリ (ルール変更候補) を出さない** (D-6)。AI_REVIEW_SAFETY.md §9 と整合。
+- 上記は MVP 限定の妥協。historical universe を提供するソースを採用したら直ちに切替 (`survivorship_policy = "historical"`、`survivorship_warning = false`)。
+- pytest 候補: `test_survivorship_policy_recorded` (PR-S3) で run_metadata に `survivorship_policy` キーが必ず存在することを検証。
 
 ---
 
@@ -117,11 +156,20 @@ universe_snapshot:
 
 ---
 
-## 10. 要決定チェックリスト
+## 10. チェックリスト
 
-- [ ] 初期ユニバース (日経225 / TOPIX500 / 自由リスト)
-- [ ] historical universe ソース (J-Quants / 有償 / 自社蓄積)
-- [ ] MVP で「static_current_listing」を許容するか
-- [ ] ETF / REIT / ADR / 種類株の MVP 除外ルール
-- [ ] 銘柄コードのキー形式 (4桁 / 5桁 / 市場区分付き / ISIN)
-- [ ] universe_snapshot のストレージ先 (data/raw/ 配下)
+### 10-1. 決定済 (N2 / PR-S0.5 で確定)
+
+- [x] 初期ユニバースは MVP-1 = 自由銘柄リスト (D-1)
+- [x] MVP で「static_current_listing」を許容する (D-4)
+- [x] AI Review は survivorship-biased 状態で C 提案を出さない (D-6)
+- [x] ETF / REIT / ADR / 種類株は MVP 除外 (D-3)
+- [x] universe_snapshot_id は run_metadata 必須 (D-7)
+- [x] MVP では実 CSV をコミットしない。サンプル雛形のみ docs に記載 (D-8)
+
+### 10-2. 未確定 (PR-S1 着手前にユーザ承認が必要)
+
+- [ ] historical universe ソース (J-Quants / 有償 / 自社蓄積) — MVP-2 着手前
+- [ ] 銘柄コードのキー形式 (4桁 / 4桁+市場区分 / ISIN) — PR-S1 着手前に決定
+- [ ] universe スナップショットの格納先 (`data/universe/` 想定だが本確定は PR-S1 で)
+- [ ] MVP-1 の初期銘柄リスト (実データ投入は別 PR でユーザ承認)

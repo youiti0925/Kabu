@@ -4,6 +4,26 @@
 
 ---
 
+## 0. MVP 決定 (PR-S0.5 / N2 で確定)
+
+本セクションは「決定」であり、後続 PR は本決定に従う。変更には別途承認が必要。
+
+- D-1. **top-level `interval` を schema 必須** にする (CALENDAR.md §0 D-1)。MVP は `"1d"` 固定。
+- D-2. **top-level `bar_ts_close` を schema 必須** にする (CALENDAR.md §0 D-6)。
+- D-3. **top-level `bar_ts_available` を schema 必須** にする (CALENDAR.md §0 D-6)。
+- D-4. **bar_ts は原則 `bar_ts_available`** とする (CALENDAR.md §0 D-7)。
+- D-5. **`decision.rule_id` / `decision.rule_version` / `decision.rule_params_hash` を必須** にする。
+- D-6. **`decision.confidence` は `[0.0, 1.0]` または null**。値域外を禁止 (writer / reader でバリデーション)。
+- D-7. **`execution_assumption.assumed_fill_bar` を必須** にする (BACKTEST_CONTRACT.md §0 D-5)。
+- D-8. **`execution_assumption.latency_bars` を必須** にする (BACKTEST_CONTRACT.md §0 D-6)。
+- D-9. **`technical.adjustment_basis` を必須** にする (BACKTEST_CONTRACT.md §0 D-9)。
+- D-10. **`future_outcome.forward_return_basis` を必須** にする。
+- D-11. **`future_outcome` は decision builder の入力に含めない**。型シグネチャと pytest で強制 (POINT_IN_TIME.md §3-4)。
+- D-12. **`library_id` は top-level に置かず、利用する slice 内 (例 `slices.waveform_ctx.library_id`) に置く**。v1 の互換性維持のため top-level に残っていた `library_id` は **deprecated** として扱い、新規 trace は slice 内に書く。
+- D-13. **`run_metadata.libraries` は配列とし、複数 library を `[{slice, library_id, library_kind, feature_set}]` の形で管理** する。
+
+---
+
 ## 1. schema_version
 
 - 値: `"kabu.trace.v1"`
@@ -27,29 +47,32 @@
 
 ---
 
-## 2. top-level 必須項目
+## 2. top-level 必須項目 (決定)
+
+§0 D-1 / D-2 / D-3 / D-4 / D-12 を反映。
 
 ```
 schema_version       : "kabu.trace.v1"          # 必須
 run_id               : str                      # 必須。run_metadata と紐づく
-trace_schema_version : str                      # = schema_version (互換性のため二重保存)
+trace_schema_version : str                      # 必須 = schema_version (互換性のため二重保存)
 commit_sha           : str                      # 必須
 created_at           : datetime                 # 必須 (record 書き込み時刻)
 symbol               : str                      # 必須 (例: "7203" / "7203.T" 等。表現は UNIVERSE.md と整合)
 market               : str                      # 必須 (例: "TSE_PRIME")
 sector               : str                      # 必須 (33業種コード等)
-interval             : str                      # 必須 (MVP は "1d" 固定)
-bar_ts               : datetime                 # 必須 (timezone-aware)
-bar_ts_close         : datetime                 # 必須 (CALENDAR.md 参照)
-bar_ts_available     : datetime                 # 必須 (CALENDAR.md 参照)
-universe_snapshot_id : str                      # 必須 (UNIVERSE.md 参照)
-data_snapshot_hash   : str                      # 必須 (DATA_SOURCES.md 参照)
-library_id           : str | null               # optional (waveform_ctx 用、top-level 配置は将来 deprecated 候補)
+interval             : str                      # 必須 (MVP は "1d" 固定。CALENDAR.md §0 D-1 / SCHEMA §0 D-1)
+bar_ts               : datetime                 # 必須 (timezone-aware)。原則 bar_ts_available と等しい (D-4)
+bar_ts_close         : datetime                 # 必須 (CALENDAR.md §0 D-6 / SCHEMA §0 D-2)
+bar_ts_available     : datetime                 # 必須 (CALENDAR.md §0 D-6 / SCHEMA §0 D-3)
+universe_snapshot_id : str                      # 必須 (UNIVERSE.md §0 D-7)
+data_snapshot_hash   : str                      # 必須 (DATA_SOURCES.md §0 D-5)
 unavailable_reason   : str | null               # 必須キー (値は null 可)。slice まで届かなかった場合の総括
 slices               : { ... }                  # 下記
 ```
 
-注: `library_id` は v1 互換のため top-level に置くが、将来は `slices.waveform_ctx.library_id` に集約することを推奨。`run_metadata` に複数の `library_ids[]` を持たせる方針も検討対象。
+注:
+- 旧 v1 互換 `library_id` (top-level) は **deprecated** (§0 D-12)。新規 trace は **slice 内** (例 `slices.waveform_ctx.library_id`) に書く。reader は top-level の `library_id` を warning 付きで読み込み可。writer は slice 内のみ書く。
+- `run_metadata` 側では `libraries: [{slice, library_id, library_kind, feature_set}]` で複数 library を保持する (§0 D-13 / BACKTEST_CONTRACT.md §7)。
 
 ---
 
@@ -109,8 +132,10 @@ tick_size           : float | null # optional (PR-S0.7 で確定)
 
 ### 4-2. technical
 
+§0 D-9 により `adjustment_basis` は必須。
+
 ```
-adjustment_basis : "split_dividend_back_adjusted"   # 必須 (v1 はこの値固定を推奨)
+adjustment_basis : "split_dividend_back_adjusted"   # 必須。v1 はこの値固定 (D-9)
 sma20            : float | null
 sma60            : float | null
 sma200           : float | null
@@ -192,31 +217,39 @@ unavailable_reason    : str | null
 
 ### 4-8. decision
 
+§0 D-5 / D-6 を反映。`rule_id` / `rule_version` / `rule_params_hash` は **必須**。`confidence` の値域は `[0.0, 1.0]` または null。
+
 ```
-final_action           : "buy" | "hold" | "sell_to_close" | "no_position"
-technical_only_action  : "buy" | "hold" | "sell_to_close" | "no_position"
-rule_id                : str
-rule_version           : str
-rule_params_hash       : str
-confidence             : float | null   # 値域 [0, 1] (null 可)
+final_action           : "buy" | "hold" | "sell_to_close" | "no_position"   # 必須
+technical_only_action  : "buy" | "hold" | "sell_to_close" | "no_position"   # 必須
+rule_id                : str                                                # 必須 (D-5)
+rule_version           : str                                                # 必須 (D-5)
+rule_params_hash       : str                                                # 必須 (D-5)
+confidence             : float | null                                       # [0.0, 1.0] または null (D-6)
 ```
 
-注: MVP は long_only / 現物相当のため `sell_to_close` (= ロング決済) と `no_position` のみが close 系の状態。空売りを表す `short_open` 等は v1 では使わない (将来 schema_version 引き上げまたは optional 拡張で対応)。
+注:
+- MVP は long_only / 現物相当のため `sell_to_close` (= ロング決済) と `no_position` のみが close 系の状態。空売りを表す `short_open` 等は v1 では使わない (将来 schema_version 引き上げまたは optional 拡張で対応)。
+- `confidence` の値域外 (例 1.2 / -0.1) は writer / reader でバリデーション。null は「未定義」であり「中立」ではない (§5-4)。
 
 ### 4-9. execution_assumption
 
+§0 D-7 / D-8 により `assumed_fill_bar` / `latency_bars` は **必須**。
+
 ```
-assumed_fill_bar  : "next_open"           # MVP 固定。CALENDAR.md / BACKTEST_CONTRACT.md と整合
-latency_bars      : 1                     # MVP 固定
-fill_price        : float | null          # null = 約定不可
-slippage_bps      : float
-fee_bps           : float
+assumed_fill_bar  : "next_open"           # 必須。MVP 固定 (D-7 / CALENDAR.md §0 D-4)
+latency_bars      : int                   # 必須。MVP は 1 固定 (D-8 / CALENDAR.md §0 D-4)
+fill_price        : float | null          # 必須キー。null = 約定不可
+slippage_bps      : float                 # 必須
+fee_bps           : float                 # 必須
 fee_fixed_jpy     : float | null          # optional (固定手数料を併用する場合)
-is_realistic      : bool                  # 出来高フロア / ストップ高安 / 売買停止を考慮した約定可否
-fill_reason       : str | null            # 例 "ok", "stop_high_blocked", "volume_floor_capped"
+is_realistic      : bool                  # 必須。出来高フロア / ストップ高安 / 売買停止を考慮した約定可否
+fill_reason       : str | null            # 必須キー。例 "ok", "stop_high_blocked", "volume_floor_capped"
 ```
 
 ### 4-10. future_outcome
+
+§0 D-10 / D-11 を反映。`forward_return_basis` は **必須**。本 slice は **decision builder の入力に含めない** (D-11)。
 
 ```
 forward_return_5d        : float | null
@@ -227,14 +260,15 @@ mae                      : float | null   # max adverse excursion
 hit_stop                 : bool | null
 outcome_label_static     : "big_win" | "win" | "flat" | "loss" | "big_loss" | null
 outcome_label_atr_norm   : "big_win" | "win" | "flat" | "loss" | "big_loss" | null
-forward_return_basis     : "close_to_close" | "open_to_close" | "open_to_open"
+forward_return_basis     : "close_to_close" | "open_to_close" | "open_to_open"   # 必須 (D-10)
 forward_return_end_ts    : datetime | null
 ```
 
 注 (極めて重要):
-- future_outcome は **post-processing で enrich** される。decision / risk / execution の判定には **絶対に参照しない**。
-- look-ahead invariant は POINT_IN_TIME.md 参照。
-- forward_return_end_ts <= 取得時の bar_ts という考え方は waveform にも適用する。
+- future_outcome は **post-processing で enrich** される。decision / risk / execution の判定には **絶対に参照しない** (D-11 / POINT_IN_TIME.md §3-4)。
+- 設計強制: `decision_trace_build` の builder 関数の入力に future_outcome を含めない型シグネチャで強制。
+- pytest `test_decision_does_not_depend_on_outcome` (PR-S2) で検証。
+- forward_return_end_ts <= 取得時の bar_ts という考え方は waveform にも適用する (POINT_IN_TIME.md §3-3)。
 
 ---
 
@@ -278,8 +312,17 @@ slice の値が null + reason 付き は許容。reason だけ無く null は不
 
 ### 5-5. universe / data snapshot
 
-- `universe_snapshot_id` を必ず持つ (UNIVERSE.md)。
-- `data_snapshot_hash` を必ず持つ (DATA_SOURCES.md)。
+- `universe_snapshot_id` を必ず持つ (UNIVERSE.md §0 D-7)。
+- `data_snapshot_hash` を必ず持つ (DATA_SOURCES.md §0 D-5)。
+
+### 5-6. library_id の配置 (決定)
+
+§0 D-12 / D-13 を反映。
+
+- 旧 v1: `library_id` は top-level に optional として存在。これは **deprecated** とする。
+- 新規 trace は **slice 内に置く**。例: `slices.waveform_ctx.library_id`, `slices.waveform_ctx.library_kind`, `slices.waveform_ctx.feature_set`。
+- reader は v1 互換のため top-level の `library_id` を warning ログ付きで読み込み可。writer は新規には書かない。
+- `run_metadata.libraries` は配列とし、`[{slice, library_id, library_kind, feature_set}]` で複数 library を管理する (D-13)。これにより waveform 以外の slice (将来の `pattern_library` 等) を追加しても schema 衝突しない。
 
 ---
 
