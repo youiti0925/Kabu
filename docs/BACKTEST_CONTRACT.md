@@ -164,6 +164,33 @@ backtest の約定タイミング・コスト・調整方針の契約。MVP は 
 
 ---
 
+## 6-A. Run output layout (P3.5 で決定)
+
+P3.5 で `kabu.run_paths.RunPaths` / `build_run_paths(base_dir, run_id)` を導入し、以下のファイル配置を **MVP 決定** として固定した。PR-S4 trace-stats はこの配置を入力前提とする。
+
+```
+runs/<run_id>/
+    run_metadata.json         # kabu.run_metadata_io
+    trace_raw.jsonl           # kabu.trace_io
+    outcome_backfill.jsonl    # kabu.outcome
+    trace_joined.jsonl        # kabu.trace_io after join
+    trades.jsonl              # kabu.backtest.io.write_trades_jsonl
+    skipped_fills.jsonl       # kabu.backtest.io.write_skipped_fills_jsonl
+    backtest_result.json      # summary + file references (NOT trades body)
+    stats/                    # PR-S4+
+```
+
+注意:
+
+- `backtest_result.json` は **summary + file references**。`trades` 本体は `trades.jsonl`、`skipped` 本体は `skipped_fills.jsonl` に分離 (ストリーミング読み込みと append-only を維持するため)。
+- `kabu.backtest.io.BacktestResultSummary` の必須フィールド: `run_id`, `created_at` (tz-aware), `initial_cash_jpy`, `final_cash_jpy`, `trade_count`, `skipped_count`, `open_position_count`, `trace_jsonl_path`, `trades_jsonl_path`, `skipped_fills_jsonl_path`。reader が欠落で `ValueError`。
+- `kabu.backtest.engine.SkippedFill` は P3.5 で `run_id` / `symbol` / `attempted_fill_ts` を必須に拡張。pytest `test_skipped_fill_jsonl_roundtrip` で round-trip を保証。
+- `runs/` は **git 管理しない** (RISKS.md 5-3 / `.gitignore` / `scripts/check_no_forbidden_paths.py`)。テストはすべて `tmp_path` を使う。pytest `test_run_paths_use_tmp_path` / `test_no_committed_run_outputs`。
+- `RunPaths.run_id` は path traversal を含む文字列を拒否 (`..`, `/`, `\\`, `\x00`)。
+- `kabu.backtest.io.write_backtest_outputs(*, paths, result, created_at)` で trades.jsonl / skipped_fills.jsonl / backtest_result.json を一括 write。
+
+---
+
 ## 7. run_metadata に必ず残す項目 (決定)
 
 §0 D-13 / D-7 / D-8 を実装契約として展開する。

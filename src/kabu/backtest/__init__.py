@@ -25,10 +25,22 @@ from kabu.backtest.fill import (
     compute_long_exit_fill_price,
 )
 from kabu.backtest.checks import is_unfillable
+from kabu.backtest.io import (
+    BacktestResultSummary,
+    read_backtest_result_json,
+    read_skipped_fills_jsonl,
+    read_trades_jsonl,
+    summarize_backtest_result,
+    write_backtest_outputs,
+    write_backtest_result_json,
+    write_skipped_fills_jsonl,
+    write_trades_jsonl,
+)
 from kabu.backtest.trade import Position, Trade
 
 __all__ = [
     "BacktestResult",
+    "BacktestResultSummary",
     "Position",
     "ScriptedDecision",
     "SkippedFill",
@@ -37,5 +49,13 @@ __all__ = [
     "compute_long_entry_fill_price",
     "compute_long_exit_fill_price",
     "is_unfillable",
+    "read_backtest_result_json",
+    "read_skipped_fills_jsonl",
+    "read_trades_jsonl",
     "run_backtest",
+    "summarize_backtest_result",
+    "write_backtest_outputs",
+    "write_backtest_result_json",
+    "write_skipped_fills_jsonl",
+    "write_trades_jsonl",
 ]

@@ -142,12 +142,14 @@ Kabu の既知のリスクと限界。各 stats レポートと AI Review はこ
 ### 5-3. runs / libs / data の commit 事故
 
 - 説明: backtest 出力 / waveform library / 大容量 raw データを誤って commit。
-- 対策 (PR-S0.9 で導入済み):
+- 対策 (PR-S0.9 で導入済み + P3.5 で強化):
   - .gitignore で `runs/`, `libs/`, `data/raw/`, `data/cache/`, `*.parquet`, `*.duckdb`, `*.sqlite`, `*.csv`, `*.pkl`, `*.feather`, `.env`, `.venv/`, `__pycache__/`, `.pytest_cache/` を除外
   - pre-commit hook で 1MB 超ファイルの commit を阻止 (`pre-commit-hooks.check-added-large-files` + `scripts/check_no_large_files.py`)
   - CI (`.github/workflows/guardrails.yml`) で `runs/ libs/ data/raw/ data/cache/` 配下や `*.parquet` 等の追跡を検出する `scripts/check_no_forbidden_paths.py` を実行
   - `scripts/check_gitignore.py` で `.gitignore` の必須エントリ抜けを検出
   - `scripts/check_secrets.py` で軽量な secret スキャン (heuristic)
+  - **P3.5 で `kabu.run_paths.RunPaths` を導入**: 全 run 出力は `base_dir / "runs" / run_id / ...` に閉じる構造。テストは `tmp_path` のみを使う規約。`tests/invariants/test_no_committed_run_outputs.py` が pytest 内でも `git ls-files` で `runs/` `libs/` `data/raw/` `data/cache/` 配下に追跡ファイルが無いことを検証する。
+  - **P3.5 で `RunPaths.run_id` のサニタイズ**: `..`, `/`, `\`, `\x00` を含む `run_id` を `ValueError` で拒否 (path traversal 防止)。
 - 後続強化 (将来 PR):
   - secret scan は heuristic スクリプトを暫定運用。本格的には [gitleaks](https://github.com/gitleaks/gitleaks) もしくは detect-secrets を CI に組み込む
   - `scripts/check_no_fx_leak.py` の禁止 token は段階的に拡張 (例: `BUY/SELL` 対称前提) し、`ruff` カスタムルール化を検討

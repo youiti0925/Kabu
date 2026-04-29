@@ -79,11 +79,39 @@ class ScriptedDecision:
 
 @dataclass(frozen=True)
 class SkippedFill:
-    """A decision the engine could not act on, with a stable reason code."""
+    """A decision the engine could not act on, with a stable reason code.
 
+    P3.5: ``run_id``, ``symbol`` and ``attempted_fill_ts`` are all required
+    so that downstream readers (trace-stats, audit) can join skips back
+    to the run they came from.
+    """
+
+    run_id: str
+    symbol: str
     decision_ts: datetime
+    attempted_fill_ts: datetime
     intended_action: str
-    reason: str  # "no_next_bar" | "halted" | "below_lot_size" | etc.
+    reason: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.run_id, str) or not self.run_id:
+            raise ValueError("SkippedFill.run_id must be non-empty")
+        if not isinstance(self.symbol, str) or not self.symbol:
+            raise ValueError("SkippedFill.symbol must be non-empty")
+        if not isinstance(self.intended_action, str) or not self.intended_action:
+            raise ValueError("SkippedFill.intended_action must be non-empty")
+        if not isinstance(self.reason, str) or not self.reason:
+            raise ValueError("SkippedFill.reason must be non-empty")
+        if self.decision_ts.tzinfo is None or self.decision_ts.tzinfo.utcoffset(
+            self.decision_ts
+        ) is None:
+            raise ValueError("SkippedFill.decision_ts must be timezone-aware")
+        if self.attempted_fill_ts.tzinfo is None or self.attempted_fill_ts.tzinfo.utcoffset(
+            self.attempted_fill_ts
+        ) is None:
+            raise ValueError(
+                "SkippedFill.attempted_fill_ts must be timezone-aware"
+            )
 
 
 @dataclass(frozen=True)
@@ -170,6 +198,7 @@ def run_backtest(
     bars_sorted = list(bars)
     bars_sorted.sort(key=lambda b: b.bar_ts)
     bar_index = _index_bars_by_ts(bars_sorted)
+    default_symbol = bars_sorted[0].symbol if bars_sorted else "unknown"
 
     trades: list[Trade] = []
     skipped: list[SkippedFill] = []
@@ -186,7 +215,10 @@ def run_backtest(
         if idx is None:
             skipped.append(
                 SkippedFill(
+                    run_id=run_id,
+                    symbol=default_symbol,
                     decision_ts=d.bar_ts,
+                    attempted_fill_ts=d.bar_ts,
                     intended_action=d.action,
                     reason="decision_bar_not_found",
                 )
@@ -195,7 +227,10 @@ def run_backtest(
         if idx + latency_bars >= len(bars_sorted):
             skipped.append(
                 SkippedFill(
+                    run_id=run_id,
+                    symbol=bars_sorted[idx].symbol,
                     decision_ts=d.bar_ts,
+                    attempted_fill_ts=bars_sorted[idx].bar_ts,
                     intended_action=d.action,
                     reason="no_next_bar",
                 )
@@ -211,7 +246,10 @@ def run_backtest(
         if unfillable is not None:
             skipped.append(
                 SkippedFill(
+                    run_id=run_id,
+                    symbol=next_bar.symbol,
                     decision_ts=d.bar_ts,
+                    attempted_fill_ts=next_bar.bar_ts,
                     intended_action=d.action,
                     reason=unfillable,
                 )
@@ -225,7 +263,10 @@ def run_backtest(
                 # Already long: ignore the redundant entry but record it.
                 skipped.append(
                     SkippedFill(
+                        run_id=run_id,
+                        symbol=symbol,
                         decision_ts=d.bar_ts,
+                        attempted_fill_ts=next_bar.bar_ts,
                         intended_action=d.action,
                         reason="already_long",
                     )
@@ -238,7 +279,10 @@ def run_backtest(
             if qty <= 0:
                 skipped.append(
                     SkippedFill(
+                        run_id=run_id,
+                        symbol=symbol,
                         decision_ts=d.bar_ts,
+                        attempted_fill_ts=next_bar.bar_ts,
                         intended_action=d.action,
                         reason="below_lot_size",
                     )
@@ -278,7 +322,10 @@ def run_backtest(
             if open_position is None:
                 skipped.append(
                     SkippedFill(
+                        run_id=run_id,
+                        symbol=symbol,
                         decision_ts=d.bar_ts,
+                        attempted_fill_ts=next_bar.bar_ts,
                         intended_action=d.action,
                         reason="not_long",
                     )

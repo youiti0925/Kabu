@@ -13,8 +13,9 @@ Kabu の PR ロードマップと pytest 不変条件候補。承認は段階的
 | N2 方針確定 | DATA_SOURCES / UNIVERSE / CALENDAR / BACKTEST_CONTRACT / SCHEMA / POINT_IN_TIME / ROADMAP の MVP 決定の docs 化 | **完了** (commit 897f5f8、CI green 確認済) |
 | PR-S1 | data source interface (Source Protocol) + indicators 純粋関数群 | **完了** (commit 694bba4、CI green 確認済) |
 | PR-S2 | decision_trace MVP (kabu.trace.v1 schema / dataclass / builder / JSONL I/O / 11 不変条件テスト) | **完了** (commit 1f80fec、CI green 確認済) |
-| PR-S3 | backtest_engine MVP + scripted-action engine + run_metadata.json + future_outcome enrich (`kabu.outcome`) | **本 PR で完了予定** |
-| PR-S4 | trace-stats MVP (final_action × outcome ほか) | 未着手 (要承認) |
+| PR-S3 | backtest_engine MVP + scripted-action engine + run_metadata.json + future_outcome enrich (`kabu.outcome`) | **完了** (commit 64908cd、CI green 確認済) |
+| P3.5 | run output layout 固定 (`kabu.run_paths`) + Trade/SkippedFill/BacktestResult I/O (`kabu.backtest.io`) + SkippedFill 拡張 | **本 PR で完了予定** |
+| PR-S4 | trace-stats MVP (final_action × outcome ほか、P3.5 で固定した入力を使用) | 未着手 (要承認) |
 
 ---
 
