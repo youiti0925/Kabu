@@ -22,6 +22,15 @@ dev = [
   "pre-commit>=3.5",
 ]
 
+# Optional vendor adapter for OHLCV smoke testing only (P4.7).
+# yfinance is NOT a point-in-time data source. Do not use it for
+# fundamentals / earnings / news (DATA_SOURCES.md S0 D-6 / D-7).
+# CI does NOT install this extra; vendor unit tests use injected
+# fake history_fn callables.
+vendor-yfinance = [
+  "yfinance>=0.2",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

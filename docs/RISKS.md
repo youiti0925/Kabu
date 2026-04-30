@@ -92,7 +92,11 @@ Kabu の既知のリスクと限界。各 stats レポートと AI Review はこ
 ### 3-1. データソース規約変更
 
 - 説明: yfinance / Stooq 等の非公式・準公式ソースは利用規約が変動する。
-- 対策: 商用化前提では J-Quants / 有償ベンダの導入が必要。DATA_SOURCES.md §9。
+- 対策:
+  - 商用化前提では J-Quants / 有償ベンダの導入が必要 (DATA_SOURCES.md §9)。
+  - P4.7 で yfinance を **OHLCV 専用の参考 vendor** として採用したが、`Source` Protocol の裏側に閉じ込めて差し替え可能にしてある (`src/kabu/data/sources/yfinance_source.py`)。
+  - vendor 切替時は `tests/invariants/test_vendor_layer_isolation.py` の `_FORBIDDEN_VENDOR_TOKENS` に新 vendor を追加し、構造的に隔離を維持する。
+  - VENDOR_SETUP.md §5 に追加手順を明記。
 
 ### 3-2. 分割・配当調整ミス
 

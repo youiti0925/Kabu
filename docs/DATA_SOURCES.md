@@ -72,7 +72,16 @@
   - 海外個別株
   - 信用残 / 浮動株 / 外国人保有 / セクターローテーション指数 等
 
-実装ベンダ候補は §2 を参照。§10 のチェックリストでユーザが選定。PR-S1 では選定確定までは Protocol + 単一の参照実装にとどめ、実データ取得処理の本格実装は行わない。
+### 3-A. P4.7 で採用した参考 vendor: yfinance
+
+PR-S4.7 で **yfinance を OHLCV 専用の参考 vendor として採用** (案 A)。詳細は `docs/VENDOR_SETUP.md`。要点:
+
+- 採用範囲は OHLCV のみ。fundamentals / earnings / news は引き続き未実装 (D-6 / D-7)。
+- 実装は `src/kabu/data/sources/yfinance_source.py` に閉じる。lazy import で `yfinance` のグローバル副作用なし。
+- runtime dependency には追加せず、`pip install -e ".[vendor-yfinance]"` の optional extra で導入。CI には extra をインストールしない。
+- 単体テストは `history_fn` injection で完全 mock 化。`tests/data/sources/test_yfinance_source.py::test_no_real_yfinance_imported` で「pytest 中は real yfinance を一切 import しない」ことを検証。
+- 構造的 isolation: `tests/invariants/test_vendor_layer_isolation.py` が `import yfinance` の漏洩を全 src ファイルで grep 検査。
+- vendor 切替 (J-Quants / 有償等) は同じ Source Protocol 経路で差し替え可能。yfinance は最初の参考実装にすぎない。
 
 ---
 
@@ -160,27 +169,28 @@
 
 ## 10. チェックリスト
 
-### 10-1. 決定済 (N2 / PR-S0.5 で確定)
+### 10-1. 決定済 (N2 / PR-S0.5 / P4.7)
 
 - [x] 初期対象市場: 日本株のみ (D-1)
 - [x] 通貨: JPY 固定 (D-2)
 - [x] 海外株 / ADR / 海外 ETF の扱い: MVP 対象外 (D-1)
 - [x] PR-S1 では Source Protocol を先に作る (D-3)
-- [x] アプリ全体からベンダ直叩き禁止 (D-3)
+- [x] アプリ全体からベンダ直叩き禁止 (D-3、`tests/invariants/test_vendor_layer_isolation.py`)
 - [x] `as_of` 引数必須 / デフォルト「今」禁止 (D-4)
 - [x] `run_metadata.data_source` / `data_source_version` 必須 (D-5)
 - [x] fundamentals は MVP 実装しない (D-6)
 - [x] PR-S8 は PIT fundamentals 確保まで未着手 (D-7)
 - [x] AI Review はファンダ由来の C 提案を出さない (D-8)
 - [x] 米国指数の時差ルール (CALENDAR.md §6) に従う (D-9)
+- [x] P4.7: 参考 vendor として yfinance を採用 (OHLCV 専用)、optional extra `vendor-yfinance` で隔離。詳細 VENDOR_SETUP.md。
 
-### 10-2. 未確定 (PR-S1 着手前にユーザ承認が必要)
+### 10-2. 未確定 (継続)
 
-- [ ] 価格データソースの最終ベンダ (yfinance / J-Quants / 自社蓄積 / 併用)
-- [ ] 主要指数のソース (Stooq / yfinance / 公式)
+- [ ] 主要指数のソース (Stooq / yfinance / 公式) — yfinance を一次候補として MVP は OHLCV パスを通すが、本採用前に商用利用条件再確認
 - [ ] fundamentals / earnings の PIT ソース (PR-S7 / S8 着手前まで延期可)
 - [ ] ニュースソース (PR-S9 まで延期可)
 - [ ] キャッシュ format (parquet 推奨 / duckdb 検討)
-- [ ] ベンダ規約の確認結果 (商用利用 / レート制限 / アカウント要件)
+- [ ] J-Quants 採用判断 (ユーザ側 API 利用可否確認後に再検討)
+- [ ] 商用化検討時の vendor 切替先 (J-Quants / Bloomberg / Refinitiv / QUICK / 自社蓄積)
 
 10-2 が確定するまで PR-S1 (data source interface) は具体的な vendor を選ばず、Protocol 定義 + 単一の参照実装 (差し替え可能、stub 相当) にとどめる。
